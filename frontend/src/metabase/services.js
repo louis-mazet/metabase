@@ -330,8 +330,8 @@ export const MetabaseApi = {
   db_autocomplete_suggestions: GET(
     "/api/database/:dbId/autocomplete_suggestions?:matchStyle=:query",
   ),
-  db_autocomplete_suggestions_full_query: GET(
-    "/api/database/:dbId/autocomplete_suggestions_full_query?query=:query&prefix=:prefix",
+  db_autocomplete_suggestions_full_query: POST(
+    "/api/database/:dbId/autocomplete_suggestions_full_query",
   ),
   db_card_autocomplete_suggestions: GET(
     "/api/database/:dbId/card_autocomplete_suggestions",
