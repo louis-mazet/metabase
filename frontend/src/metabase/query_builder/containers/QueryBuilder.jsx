@@ -85,6 +85,7 @@ import {
   getIsActionListVisible,
   getIsAdditionalInfoVisible,
   getAutocompleteResultsFn,
+  getAutocompleteResultsFullQueryFn,
   getCardAutocompleteResultsFn,
   isResultsMetadataDirty,
   getShouldShowUnsavedChangesWarning,
@@ -163,6 +164,7 @@ const mapStateToProps = (state, props) => {
     visualizationSettings: getVisualizationSettings(state),
 
     autocompleteResultsFn: getAutocompleteResultsFn(state),
+    autocompleteResultsFullQueryFn: getAutocompleteResultsFullQueryFn(state),
     cardAutocompleteResultsFn: getCardAutocompleteResultsFn(state),
 
     initialCollectionId: Collections.selectors.getInitialCollectionId(
