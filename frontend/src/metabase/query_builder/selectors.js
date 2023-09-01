@@ -978,6 +978,18 @@ export const getNativeQueryFn = createSelector(
   },
 );
 
+export const getDbFields = state => {
+  return function fields() {
+    const dbId = state.qb.card?.dataset_query?.database;
+    if (!dbId) {
+      return [];
+    }
+
+    const apiCall = MetabaseApi.db_get_fields_tables({ dbId });
+    return apiCall;
+  };
+};
+
 export const getDashboardId = state => {
   return state.qb.parentDashboard.dashboardId;
 };
