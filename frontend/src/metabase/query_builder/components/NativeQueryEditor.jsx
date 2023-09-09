@@ -22,7 +22,6 @@ import { ResizableBox } from "react-resizable";
 import { connect } from "react-redux";
 import slugg from "slugg";
 
-import sqlAutocompleteParser from "gethue/lib/parsers/genericAutocompleteParser";
 import { isEventOverElement } from "metabase/lib/dom";
 import { getEngineNativeAceMode } from "metabase/lib/engine";
 import { SQLBehaviour } from "metabase/lib/ace/sql_behaviour";
@@ -37,6 +36,7 @@ import SnippetCollections from "metabase/entities/snippet-collections";
 import SnippetFormModal from "metabase/query_builder/components/template_tags/SnippetFormModal";
 import Questions from "metabase/entities/questions";
 import { CARD_TAG_REGEX } from "metabase-lib/queries/NativeQuery";
+import sqlAutocompleteParser from "./hue/genericAutocompleteParser";
 import { ResponsiveParametersList } from "./ResponsiveParametersList";
 import NativeQueryEditorSidebar from "./NativeQueryEditor/NativeQueryEditorSidebar";
 import VisibilityToggler from "./NativeQueryEditor/VisibilityToggler";
