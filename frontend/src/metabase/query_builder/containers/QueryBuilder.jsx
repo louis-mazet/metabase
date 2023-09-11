@@ -86,6 +86,8 @@ import {
   getIsAdditionalInfoVisible,
   getAutocompleteResultsFn,
   getCardAutocompleteResultsFn,
+  getDbFields,
+  getDbId,
   isResultsMetadataDirty,
   getShouldShowUnsavedChangesWarning,
 } from "../selectors";
@@ -164,6 +166,8 @@ const mapStateToProps = (state, props) => {
 
     autocompleteResultsFn: getAutocompleteResultsFn(state),
     cardAutocompleteResultsFn: getCardAutocompleteResultsFn(state),
+    getDbFields: getDbFields(state),
+    getDbId: getDbId(state),
 
     initialCollectionId: Collections.selectors.getInitialCollectionId(
       state,
