@@ -384,10 +384,17 @@ export class NativeQueryEditor extends Component {
             }
           }
 
+          const tables = [
+            ...new Set(
+              dbWithTablesAndFields.map(({ table_name }) => table_name),
+            ),
+          ];
+          console.log(tables); // eslint-disable-line no-console
+
           // Add all tables if a table name is expected at the cursor
           if (autocomplete.suggestTables) {
-            for (const t of dbWithTablesAndFields.tables) {
-              results.push({ value: t.name, meta: "Table" });
+            for (const t of tables) {
+              results.push({ value: t, meta: "Table" });
             }
           }
 
@@ -397,14 +404,12 @@ export class NativeQueryEditor extends Component {
               .tables) {
               const tableName =
                 tableWithColumnToSuggest.identifierChain[0].name;
-              for (const currentTable of dbWithTablesAndFields.tables) {
-                if (currentTable.name === tableName) {
-                  for (const c of currentTable.fields) {
-                    results.push({
-                      value: c.name,
-                      meta: `${tableName}.${c.name}`,
-                    });
-                  }
+              for (const currentField of dbWithTablesAndFields) {
+                if (currentField.table_name === tableName) {
+                  results.push({
+                    value: currentField.field_name,
+                    meta: `${tableName}.${currentField.field_name}`,
+                  });
                 }
               }
             }
