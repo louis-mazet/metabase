@@ -993,14 +993,26 @@ export const getNativeQueryFn = createSelector(
   },
 );
 
-export const getDbFields = state => {
-  return function fields() {
+export const getDbCustomTables = state => {
+  return function tables() {
     const dbId = state.qb.card?.dataset_query?.database;
     if (!dbId) {
       return [];
     }
 
-    const apiCall = MetabaseApi.db_get_fields_tables({ dbId });
+    const apiCall = MetabaseApi.db_get_custom_tables({ dbId });
+    return apiCall;
+  };
+};
+
+export const getDbCustomFields = state => {
+  return function fields(tables) {
+    const dbId = state.qb.card?.dataset_query?.database;
+    if (!dbId) {
+      return [];
+    }
+
+    const apiCall = MetabaseApi.db_get_custom_fields({ dbId, tables });
     return apiCall;
   };
 };

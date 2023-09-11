@@ -86,7 +86,8 @@ import {
   getIsAdditionalInfoVisible,
   getAutocompleteResultsFn,
   getCardAutocompleteResultsFn,
-  getDbFields,
+  getDbCustomTables,
+  getDbCustomFields,
   getDbId,
   isResultsMetadataDirty,
   getShouldShowUnsavedChangesWarning,
@@ -166,7 +167,8 @@ const mapStateToProps = (state, props) => {
 
     autocompleteResultsFn: getAutocompleteResultsFn(state),
     cardAutocompleteResultsFn: getCardAutocompleteResultsFn(state),
-    getDbFields: getDbFields(state),
+    getDbCustomTables: getDbCustomTables(state),
+    getDbCustomFields: getDbCustomFields(state),
     getDbId: getDbId(state),
 
     initialCollectionId: Collections.selectors.getInitialCollectionId(

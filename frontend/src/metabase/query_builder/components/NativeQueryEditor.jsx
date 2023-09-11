@@ -58,7 +58,6 @@ import "./NativeQueryEditor.css";
 import { NativeQueryEditorRoot } from "./NativeQueryEditor.styled";
 
 const AUTOCOMPLETE_DEBOUNCE_DURATION = 700;
-const DB_FIELDS_CACHE_TTL = 60;
 
 export class NativeQueryEditor extends Component {
   _localUpdate = false;
@@ -321,47 +320,6 @@ export class NativeQueryEditor extends Component {
           console.log(`beforeCursor: ${beforeCursor}`); // eslint-disable-line no-console
           console.log(`afterCursor: ${afterCursor}`); // eslint-disable-line no-console
 
-          const dbId = this.props.getDbId();
-          let dbWithTablesAndFields;
-
-          let cachedDbWithTablesAndFields;
-
-          try {
-            cachedDbWithTablesAndFields = JSON.parse(
-              window.localStorage.getItem(`dbWithTablesAndFieldsForDb_${dbId}`),
-            );
-          } catch (e) {
-            console.log(e); // eslint-disable-line no-console
-          }
-
-          if (
-            cachedDbWithTablesAndFields &&
-            new Date() < new Date(cachedDbWithTablesAndFields.expiration)
-          ) {
-            console.log("Using cached tables and fields"); // eslint-disable-line no-console
-            dbWithTablesAndFields = cachedDbWithTablesAndFields.data;
-          } else {
-            console.log("Querying API for tables and fields"); // eslint-disable-line no-console
-            dbWithTablesAndFields = await this.props.getDbFields();
-
-            // TODO : Maybe Cache should be in selector.js
-            const cacheExpiration = new Date();
-            cacheExpiration.setSeconds(
-              cacheExpiration.getSeconds() + DB_FIELDS_CACHE_TTL,
-            );
-            window.localStorage.setItem(
-              `dbWithTablesAndFieldsForDb_${dbId}`,
-              JSON.stringify({
-                data: dbWithTablesAndFields,
-                expiration: cacheExpiration,
-              }),
-            );
-          }
-
-          // TODO : Remove debug
-          console.log("dbWithTablesAndFields"); // eslint-disable-line no-console
-          console.log(dbWithTablesAndFields); // eslint-disable-line no-console
-
           const dialect = "generic";
           const debug = false;
           const autocomplete = sqlAutocompleteParser.parseSql(
@@ -384,15 +342,16 @@ export class NativeQueryEditor extends Component {
             }
           }
 
-          const tables = [
-            ...new Set(
-              dbWithTablesAndFields.map(({ table_name }) => table_name),
-            ),
-          ];
-          console.log(tables); // eslint-disable-line no-console
-
           // Add all tables if a table name is expected at the cursor
           if (autocomplete.suggestTables) {
+            const dbTables = await this.props.getDbCustomTables();
+            console.log(dbTables); // eslint-disable-line no-console
+
+            const tables = dbTables.map(
+              ({ table_name, schema_name }) => `${schema_name}.${table_name}`,
+            );
+            console.log(tables); // eslint-disable-line no-console
+
             for (const t of tables) {
               results.push({ value: t, meta: "Table" });
             }
@@ -400,18 +359,28 @@ export class NativeQueryEditor extends Component {
 
           // Add columns from tables suggested by hue, if a column is expected at the cursor
           if (autocomplete.suggestColumns) {
-            for (const tableWithColumnToSuggest of autocomplete.suggestColumns
-              .tables) {
-              const tableName =
-                tableWithColumnToSuggest.identifierChain[0].name;
-              for (const currentField of dbWithTablesAndFields) {
-                if (currentField.table_name === tableName) {
-                  results.push({
-                    value: currentField.field_name,
-                    meta: `${tableName}.${currentField.field_name}`,
-                  });
-                }
-              }
+            const tables = autocomplete.suggestColumns.tables.map(table => {
+              return {
+                name:
+                  table.identifierChain.length > 1
+                    ? table.identifierChain[1].name
+                    : table.identifierChain[0].name,
+                schema_:
+                  table.identifierChain.length > 1
+                    ? table.identifierChain[0].name
+                    : "undefined",
+              };
+            });
+            console.log(tables); // eslint-disable-line no-console
+
+            const dbFields = await this.props.getDbCustomFields(tables);
+            console.log(dbFields); // eslint-disable-line no-console
+
+            for (const f of dbFields) {
+              results.push({
+                value: f.field_name,
+                meta: `${f.schema_name}.${f.table_name}.${f.field_name}`,
+              });
             }
           }
 
