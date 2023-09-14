@@ -344,16 +344,26 @@ export class NativeQueryEditor extends Component {
 
           // Add all tables if a table name is expected at the cursor
           if (autocomplete.suggestTables) {
-            const dbTables = await this.props.getDbCustomTables();
-            console.log(dbTables); // eslint-disable-line no-console
+            if (autocomplete.suggestTables.identifierChain) {
+              const dbTables = await this.props.getDbCustomTables(
+                autocomplete.suggestTables.identifierChain[0].name,
+              );
+              console.log(dbTables); // eslint-disable-line no-console
 
-            const tables = dbTables.map(
-              ({ table_name, schema_name }) => `${schema_name}.${table_name}`,
-            );
-            console.log(tables); // eslint-disable-line no-console
+              for (const t of dbTables) {
+                results.push({ value: t, meta: "Table" });
+              }
+            } else {
+              const dbSchemas = await this.props.getDbCustomSchemas();
+              console.log(dbSchemas); // eslint-disable-line no-console
 
-            for (const t of tables) {
-              results.push({ value: t, meta: "Table" });
+              for (const s of dbSchemas) {
+                results.push({
+                  value:
+                    (autocomplete.suggestTables.prependFrom ? "FROM " : "") + s,
+                  meta: "Schema",
+                });
+              }
             }
           }
 
@@ -361,11 +371,11 @@ export class NativeQueryEditor extends Component {
           if (autocomplete.suggestColumns) {
             const tables = autocomplete.suggestColumns.tables.map(table => {
               return {
-                name:
+                table_name:
                   table.identifierChain.length > 1
                     ? table.identifierChain[1].name
                     : table.identifierChain[0].name,
-                schema_:
+                schema_name:
                   table.identifierChain.length > 1
                     ? table.identifierChain[0].name
                     : "undefined",
@@ -379,7 +389,7 @@ export class NativeQueryEditor extends Component {
             for (const f of dbFields) {
               results.push({
                 value: f.field_name,
-                meta: `${f.schema_name}.${f.table_name}.${f.field_name}`,
+                meta: `${f.table_name}.${f.field_name}`,
               });
             }
           }
@@ -494,7 +504,7 @@ export class NativeQueryEditor extends Component {
   }
 
   _retriggerAutocomplete = _.debounce(() => {
-    if (this._editor.completer?.popup?.isOpen) {
+    if (!this._editor.completer?.popup?.isOpen) {
       this._editor.execCommand("startAutocomplete");
     }
   }, AUTOCOMPLETE_DEBOUNCE_DURATION);

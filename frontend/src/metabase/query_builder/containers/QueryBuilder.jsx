@@ -86,6 +86,7 @@ import {
   getIsAdditionalInfoVisible,
   getAutocompleteResultsFn,
   getCardAutocompleteResultsFn,
+  getDbCustomSchemas,
   getDbCustomTables,
   getDbCustomFields,
   getDbId,
@@ -167,6 +168,7 @@ const mapStateToProps = (state, props) => {
 
     autocompleteResultsFn: getAutocompleteResultsFn(state),
     cardAutocompleteResultsFn: getCardAutocompleteResultsFn(state),
+    getDbCustomSchemas: getDbCustomSchemas(state),
     getDbCustomTables: getDbCustomTables(state),
     getDbCustomFields: getDbCustomFields(state),
     getDbId: getDbId(state),
