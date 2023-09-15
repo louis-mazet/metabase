@@ -36,6 +36,7 @@ import SnippetCollections from "metabase/entities/snippet-collections";
 import SnippetFormModal from "metabase/query_builder/components/template_tags/SnippetFormModal";
 import Questions from "metabase/entities/questions";
 import { CARD_TAG_REGEX } from "metabase-lib/queries/NativeQuery";
+import sqlAutocompleteParser from "./hue/genericAutocompleteParser";
 import { ResponsiveParametersList } from "./ResponsiveParametersList";
 import NativeQueryEditorSidebar from "./NativeQueryEditor/NativeQueryEditorSidebar";
 import VisibilityToggler from "./NativeQueryEditor/VisibilityToggler";
@@ -57,7 +58,6 @@ import "./NativeQueryEditor.css";
 import { NativeQueryEditorRoot } from "./NativeQueryEditor.styled";
 
 const AUTOCOMPLETE_DEBOUNCE_DURATION = 700;
-const AUTOCOMPLETE_CACHE_DURATION = AUTOCOMPLETE_DEBOUNCE_DURATION * 1.2; // tolerate 20%
 
 export class NativeQueryEditor extends Component {
   _localUpdate = false;
@@ -287,7 +287,125 @@ export class NativeQueryEditor extends Component {
       this._editor.focus();
     }
 
+    const hueSqlCompleter = {
+      getCompletions: async (_editor, _session, _pos, prefix, callback) => {
+        const results = [];
+
+        try {
+          const cursor = _editor.getCursorPosition();
+
+          let beforeCursor = "";
+          let afterCursor = "";
+
+          _editor
+            .getValue()
+            .split("\n")
+            .forEach((value, index) => {
+              if (index < cursor.row) {
+                beforeCursor = beforeCursor + " " + value + " ";
+              }
+              if (index === cursor.row) {
+                beforeCursor = beforeCursor + value.substring(0, cursor.column);
+                afterCursor = value.substring(cursor.column) + " ";
+              } else {
+                afterCursor = afterCursor + " " + value;
+              }
+            });
+
+          // TODO : Remove debug
+          console.log(`beforeCursor: ${beforeCursor}`); // eslint-disable-line no-console
+          console.log(`afterCursor: ${afterCursor}`); // eslint-disable-line no-console
+
+          const dialect = "generic";
+          const debug = false;
+          const autocomplete = sqlAutocompleteParser.parseSql(
+            beforeCursor,
+            afterCursor,
+            dialect,
+            debug,
+          );
+
+          console.log("autocomplete"); // eslint-disable-line no-console
+          console.log(autocomplete); // eslint-disable-line no-console
+
+          // The autocomplete object gives us a list of what to suggest to the user,
+          // it is then up to us to populate the results with those suggestion, according the db metadata
+
+          // Add keywords if hue suggests any
+          if (autocomplete.suggestKeywords) {
+            for (const k of autocomplete.suggestKeywords) {
+              results.push({ value: k.value, meta: "Keyword" });
+            }
+          }
+
+          // Add tables and schemas
+          if (autocomplete.suggestTables) {
+            if (autocomplete.suggestTables.identifierChain) {
+              // If suggestTables has an identifierChain, then the user already typed the schema
+              // We can add tables from that schema to the list of suggestions
+              const dbTables = await this.props.getDbCustomTables(
+                autocomplete.suggestTables.identifierChain[0].name,
+              );
+              console.log(dbTables); // eslint-disable-line no-console
+
+              for (const t of dbTables) {
+                results.push({ value: t, meta: "Table" });
+              }
+            } else {
+              // Otherwise, the user has not typed a schema yet, so we add the list of schemas
+              const dbSchemas = await this.props.getDbCustomSchemas();
+              console.log(dbSchemas); // eslint-disable-line no-console
+
+              for (const s of dbSchemas) {
+                results.push({
+                  value:
+                    (autocomplete.suggestTables.prependFrom ? "FROM " : "") + s,
+                  meta: "Schema",
+                });
+              }
+            }
+          }
+
+          // Add columns from tables suggested by hue, if a column is expected at the cursor
+          if (autocomplete.suggestColumns) {
+            // We prepare the body of the POST to get_custom_fields
+            const tables = autocomplete.suggestColumns.tables.map(table => {
+              return {
+                table_name:
+                  table.identifierChain.length > 1
+                    ? table.identifierChain[1].name
+                    : table.identifierChain[0].name,
+                schema_name:
+                  table.identifierChain.length > 1
+                    ? table.identifierChain[0].name
+                    : "undefined",
+              };
+            });
+            console.log(tables); // eslint-disable-line no-console
+
+            const dbFields = await this.props.getDbCustomFields(tables);
+            console.log(dbFields); // eslint-disable-line no-console
+
+            for (const f of dbFields) {
+              results.push({
+                value: f.field_name,
+                meta: `${f.table_name}.${f.field_name}`,
+              });
+            }
+          }
+
+          // TODO : simple heuristics, only if hue returns an error
+
+          callback(null, results);
+        } catch (error) {
+          console.error("error getting autocompletion data", error);
+          callback(null, []);
+        }
+      },
+    };
+
     const aceLanguageTools = ace.require("ace/ext/language_tools");
+    aceLanguageTools.setCompleters([hueSqlCompleter]);
     this._editor.setOptions({
       enableBasicAutocompletion: true,
       enableSnippets: false,
@@ -296,75 +414,6 @@ export class NativeQueryEditor extends Component {
       highlightActiveLine: false,
       highlightGutterLine: false,
       showLineNumbers: true,
-    });
-
-    this._lastAutoComplete = { timestamp: 0, prefix: null, results: [] };
-
-    aceLanguageTools.addCompleter({
-      getCompletions: async (_editor, _session, _pos, prefix, callback) => {
-        if (!this.props.autocompleteResultsFn) {
-          return callback(null, []);
-        }
-
-        try {
-          let { results, timestamp } = this._lastAutoComplete;
-          const cacheHit =
-            Date.now() - timestamp < AUTOCOMPLETE_CACHE_DURATION &&
-            this._lastAutoComplete.prefix === prefix;
-          if (!cacheHit) {
-            // Get models and fields from tables
-            // HACK: call this.props.autocompleteResultsFn rather than caching the prop since it might change
-            const apiResults = await this.props.autocompleteResultsFn(prefix);
-            this._lastAutoComplete = {
-              timestamp: Date.now(),
-              prefix,
-              results,
-            };
-
-            // Get referenced questions
-            const referencedQuestionIds =
-              this.props.query.referencedQuestionIds();
-            // The results of the API call are cached by ID
-            const referencedQuestions = await Promise.all(
-              referencedQuestionIds.map(id => this.props.fetchQuestion(id)),
-            );
-
-            // Get columns from referenced questions that match the prefix
-            const lowerCasePrefix = prefix.toLowerCase();
-            const isMatchForPrefix = name =>
-              name.toLowerCase().includes(lowerCasePrefix);
-            const questionColumns = referencedQuestions
-              .filter(Boolean)
-              .flatMap(question =>
-                question.result_metadata
-                  .filter(columnMetadata =>
-                    isMatchForPrefix(columnMetadata.name),
-                  )
-                  .map(columnMetadata => [
-                    columnMetadata.name,
-                    `${question.name} :${columnMetadata.base_type}`,
-                  ]),
-              );
-
-            // Concat the results from tables, fields, and referenced questions.
-            // The ace editor will deduplicate results based on name, keeping results
-            // that come first. In case of a name conflict, prioritise referenced
-            // questions' columns over tables and fields.
-            results = questionColumns.concat(apiResults);
-          }
-
-          // transform results into what ACE expects
-          const resultsForAce = results.map(([name, meta]) => ({
-            name: name,
-            value: name,
-            meta: meta,
-          }));
-          callback(null, resultsForAce);
-        } catch (error) {
-          console.error("error getting autocompletion data", error);
-          callback(null, []);
-        }
-      },
     });
 
     // the completers when the editor mounts are the standard ones
@@ -455,7 +504,7 @@ export class NativeQueryEditor extends Component {
   }
 
   _retriggerAutocomplete = _.debounce(() => {
-    if (this._editor.completer?.popup?.isOpen) {
+    if (!this._editor.completer?.popup?.isOpen) {
       this._editor.execCommand("startAutocomplete");
     }
   }, AUTOCOMPLETE_DEBOUNCE_DURATION);

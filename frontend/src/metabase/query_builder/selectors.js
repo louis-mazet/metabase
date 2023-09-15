@@ -993,6 +993,48 @@ export const getNativeQueryFn = createSelector(
   },
 );
 
+export const getDbCustomSchemas = state => {
+  return function tables() {
+    const dbId = state.qb.card?.dataset_query?.database;
+    if (!dbId) {
+      return [];
+    }
+
+    const apiCall = MetabaseApi.db_get_custom_schemas({ dbId });
+    return apiCall;
+  };
+};
+
+export const getDbCustomTables = state => {
+  return function tables(schema) {
+    const dbId = state.qb.card?.dataset_query?.database;
+    if (!dbId) {
+      return [];
+    }
+
+    const apiCall = MetabaseApi.db_get_custom_tables({ dbId, schema });
+    return apiCall;
+  };
+};
+
+export const getDbCustomFields = state => {
+  return function fields(tables) {
+    const dbId = state.qb.card?.dataset_query?.database;
+    if (!dbId) {
+      return [];
+    }
+
+    const apiCall = MetabaseApi.db_get_custom_fields({ dbId, tables });
+    return apiCall;
+  };
+};
+
+export const getDbId = state => {
+  return function dbId() {
+    return state.qb.card?.dataset_query?.database;
+  };
+};
+
 export const getDashboardId = state => {
   return state.qb.parentDashboard.dashboardId;
 };
