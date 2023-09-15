@@ -289,10 +289,6 @@ export class NativeQueryEditor extends Component {
 
     const hueSqlCompleter = {
       getCompletions: async (_editor, _session, _pos, prefix, callback) => {
-        if (!this.props.autocompleteResultsFn) {
-          return callback(null, []);
-        }
-
         const results = [];
 
         try {
@@ -342,9 +338,11 @@ export class NativeQueryEditor extends Component {
             }
           }
 
-          // Add all tables if a table name is expected at the cursor
+          // Add tables and schemas
           if (autocomplete.suggestTables) {
             if (autocomplete.suggestTables.identifierChain) {
+              // If suggestTables has an identifierChain, then the user already typed the schema
+              // We can add tables from that schema to the list of suggestions
               const dbTables = await this.props.getDbCustomTables(
                 autocomplete.suggestTables.identifierChain[0].name,
               );
@@ -354,6 +352,7 @@ export class NativeQueryEditor extends Component {
                 results.push({ value: t, meta: "Table" });
               }
             } else {
+              // Otherwise, the user has not typed a schema yet, so we add the list of schemas
               const dbSchemas = await this.props.getDbCustomSchemas();
               console.log(dbSchemas); // eslint-disable-line no-console
 
@@ -369,6 +368,7 @@ export class NativeQueryEditor extends Component {
 
           // Add columns from tables suggested by hue, if a column is expected at the cursor
           if (autocomplete.suggestColumns) {
+            // We prepare the body of the POST to get_custom_fields
             const tables = autocomplete.suggestColumns.tables.map(table => {
               return {
                 table_name:
@@ -394,7 +394,7 @@ export class NativeQueryEditor extends Component {
             }
           }
 
-          // TODO : Here is were we should add more intelligent logic, propose schemas, etc
+          // TODO : simple heuristics, only if hue returns an error
 
           callback(null, results);
         } catch (error) {
